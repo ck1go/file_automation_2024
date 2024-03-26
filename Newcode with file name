@@ -1,0 +1,23 @@
+pipeline {
+    agent any
+    
+    parameters {
+        choice(name: 'environments', choices: ['dev', 'prod'], description: 'Select environment')
+        string(name: 'date', defaultValue: '2024-01-01', description: 'Enter the date from which data should be deleted (YYYY-MM-DD)')
+    }
+    
+    stages {
+        stage('Delete Old Data') {
+            steps {
+                script {
+                    def bucketName = "your_bucket_name"
+                    def selectedDate = params.date
+                    def folderToDelete = selectedDate.replaceAll('-', '/')
+                    
+                    // Delete folder from bucket
+                    sh "gsutil -m rm -r gs://${bucketName}/${folderToDelete}"
+                }
+            }
+        }
+    }
+}
