@@ -1,0 +1,64 @@
+pipeline {
+    agent any
+    
+    parameters {
+        choice(name: 'environments', choices: ['dev', 'prod'], description: 'Select environment')
+        string(name: 'file_date_years', defaultValue: '2024', description: 'Enter the year for which folders should be deleted')
+    }
+    
+    stages {
+        stage('Delete Old Folders') {
+            steps {
+                script {
+                    def bucketName = "your_bucket_name"
+                    def selectedYear = params.file_date_years.toInteger()
+                    def olderThanYear = selectedYear - 2
+                    def foldersToDelete = []
+                    
+                    // List folders in the bucket
+                    sh """
+                    gsutil ls -d gs://${bucketName}/*/
+                    """ .trim().eachLine { folder ->
+                        // Extract the year part from the folder name (e.g., 20240311)
+                        def folderYear = folder.take(4).toInteger()
+                        if (folderYear <= olderThanYear) {
+                            foldersToDelete.add(folder)
+                        }
+                    }
+                    
+                    // Terraform configuration to delete old folders
+                    def terraformScript = """
+                    terraform {
+                        required_version = ">= 0.14.0"
+                        required_providers {
+                            google = {
+                                source  = "hashicorp/google"
+                                version = "3.5.0"
+                            }
+                        }
+                        backend "gcs" {}
+                    }
+                    
+                    """
+                    
+                    // Add resource blocks for each folder to delete
+                    foldersToDelete.each { folder ->
+                        terraformScript += """
+                        resource "google_storage_bucket_object" "folder_${folder.hashCode()}" {
+                            bucket = "${bucketName}"
+                            name = "${folder}"
+                            force_destroy = true
+                        }
+                        
+                        """
+                    }
+                    
+                    sh """
+                    echo '${terraformScript}' > terraform_script.tf
+                    terraform apply -auto-approve
+                    """
+                }
+            }
+        }
+    }
+}
