@@ -1,0 +1,43 @@
+pipeline {
+    agent any
+    
+    parameters {
+        choice(name: 'environments', choices: ['dev', 'prod'], description: 'Select environment')
+        string(name: 'file_date_years', defaultValue: '2', description: 'Enter the number of years for files to be deleted')
+    }
+    
+    stages {
+        stage('Delete Old Data') {
+            steps {
+                script {
+                    def bucketName = "your_bucket_name"
+                    def olderThan = sh(script: "date -d '${params.file_date_years} years ago' +'%Y-%m-%d'", returnStdout: true).trim()
+                    
+                    // Terraform configuration to delete old files
+                    sh """
+                    terraform {
+                        required_version = ">= 0.14.0"
+                        required_providers {
+                            google = {
+                                source  = "hashicorp/google"
+                                version = "3.5.0"
+                            }
+                        }
+                        backend "gcs" {}
+                    }
+                    
+                    resource "google_storage_bucket_object" "old_files" {
+                        for_each = google_storage_bucket_object.objects
+                        bucket = "${bucketName}"
+                        name = each.value.name
+                        if (each.value.time_created < "${olderThan}T00:00:00Z") {
+                            content {}
+                        }
+                    }
+                    
+                    """
+                }
+            }
+        }
+    }
+}
