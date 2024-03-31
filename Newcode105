@@ -1,0 +1,33 @@
+pipeline {
+    agent any
+    
+    parameters {
+        choice(name: 'environment', choices: ['dev', 'prod'], description: 'Select environment')
+        string(name: 'date_range', defaultValue: '2024-01-01 to 2024-01-31', description: 'Enter the date range in the format "YYYY-MM-DD to YYYY-MM-DD"')
+    }
+    
+    stages {
+        stage('Delete Data') {
+            steps {
+                script {
+                    def bucketName = "your_bucket_name"
+                    def dateRange = params.date_range.tokenize(" to ")
+                    def startDate = Date.parse('yyyy-MM-dd', dateRange[0])
+                    def endDate = Date.parse('yyyy-MM-dd', dateRange[1])
+                    
+                    // Format dates to match folder structure
+                    def startDateFormatted = startDate.format('yyyyMMdd')
+                    def endDateFormatted = endDate.format('yyyyMMdd')
+                    
+                    // List folders in the specified date range
+                    def foldersToDelete = sh(script: "gsutil ls -d gs://${bucketName}/${startDateFormatted}* | grep -E '${startDateFormatted}|${endDateFormatted}'", returnStdout: true).trim().split('\n')
+                    
+                    // Delete folders and their contents
+                    for (def folder in foldersToDelete) {
+                        sh "gsutil -m rm -r ${folder}"
+                    }
+                }
+            }
+        }
+    }
+}
