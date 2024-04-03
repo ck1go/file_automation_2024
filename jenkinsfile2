@@ -1,0 +1,48 @@
+pipeline {
+    agent any
+    
+    parameters {
+        choice(
+            choices: ['development', 'production'],
+            description: 'Select environment',
+            name: 'ENVIRONMENT'
+        )
+        string(
+            defaultValue: 'YYYY-MM-DD',
+            description: 'Enter start date (YYYY-MM-DD)',
+            name: 'START_DATE'
+        )
+        string(
+            defaultValue: 'YYYY-MM-DD',
+            description: 'Enter end date (YYYY-MM-DD)',
+            name: 'END_DATE'
+        )
+    }
+
+    stages {
+        stage('List and Delete Folders') {
+            steps {
+                script {
+                    def environment = params.ENVIRONMENT
+                    def startDate = params.START_DATE
+                    def endDate = params.END_DATE
+
+                    // Authenticate with Google Cloud SDK
+                    sh 'gcloud auth activate-service-account --key-file=path/to/service-account-key.json'
+
+                    // List folders in the specified bucket between start and end dates
+                    def folders = sh(script: "gsutil ls -d gs://your_bucket_name/** | grep -E '/[0-9]{8}/' | awk -F/ '{print \$NF}'", returnStdout: true).trim().split('\n')
+
+                    // Loop through each folder and delete it if it falls within the date range
+                    folders.each { folder ->
+                        def folderDate = folder.replaceAll('[^0-9]', '') // Extract date from folder name
+                        if (folderDate >= startDate.replaceAll('-', '') && folderDate <= endDate.replaceAll('-', '')) {
+                            echo "Deleting folder ${folder}"
+                            sh "gsutil -m rm -r gs://your_bucket_name/${folder}"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

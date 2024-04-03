@@ -1,0 +1,45 @@
+pipeline {
+    agent any
+    
+    parameters {
+        choice(
+            choices: ['development', 'production'],
+            description: 'Select environment',
+            name: 'ENVIRONMENT'
+        )
+        string(
+            defaultValue: 'YYYY-MM-DD',
+            description: 'Enter start date (YYYY-MM-DD)',
+            name: 'START_DATE'
+        )
+        string(
+            defaultValue: 'YYYY-MM-DD',
+            description: 'Enter end date (YYYY-MM-DD)',
+            name: 'END_DATE'
+        )
+    }
+
+    stages {
+        stage('List Files') {
+            steps {
+                script {
+                    def environment = params.ENVIRONMENT
+                    def startDate = params.START_DATE
+                    def endDate = params.END_DATE
+
+                    // Authenticate with Google Cloud SDK
+                    sh 'gcloud auth activate-service-account --key-file=path/to/service-account-key.json'
+
+                    // List files in the specified bucket between start and end dates
+                    def objects = sh(script: "gsutil ls gs://your_bucket_name/** | grep -E '${startDate}.*${endDate}'", returnStdout: true).trim().split('\n')
+
+                    // Loop through each object and delete it
+                    objects.each { object ->
+                        echo "Deleting ${object}"
+                        sh "gsutil rm ${object}"
+                    }
+                }
+            }
+        }
+    }
+}
