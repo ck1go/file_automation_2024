@@ -1,0 +1,33 @@
+pipeline {
+    agent any
+    
+    parameters {
+        choice(name: 'environment', choices: ['dev', 'qa', 'prod'], description: 'Select the environment')
+        string(name: 'startDate', defaultValue: '', description: 'Select the start date (YYYYMMDD)')
+        string(name: 'endDate', defaultValue: '', description: 'Select the end date (YYYYMMDD)')
+    }
+    
+    stages {
+        stage('List Folders from GCS Bucket') {
+            steps {
+                script {
+                    def bucketName = 'your-gcs-bucket-name'
+                    def gcsPath = 'your/gcs/path' // Update with your GCS path
+                    
+                    // Authenticate with GCS using service account credentials
+                    withCredentials([gcpServiceAccount(credentialsId: 'your-credentials-id', scope: 'https://www.googleapis.com/auth/cloud-platform')]) {
+                        // Use gsutil to list folders based on provided date range
+                        def startDate = params.startDate
+                        def endDate = params.endDate
+                        def cmd = "gsutil ls -r gs://${bucketName}/${gcsPath}/${startDate}*/${endDate}*"
+                        def output = sh(script: cmd, returnStdout: true).trim()
+                        
+                        // Output the list of folders
+                        echo "Folders in GCS matching the date range:"
+                        echo output
+                    }
+                }
+            }
+        }
+    }
+}
