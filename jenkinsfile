@@ -1,0 +1,40 @@
+pipeline {
+    agent any
+    
+    parameters {
+        string(name: 'startDate', defaultValue: '', description: 'Start date (YYYYMMDD) for folder deletion')
+        string(name: 'endDate', defaultValue: '', description: 'End date (YYYYMMDD) for folder deletion')
+    }
+    
+    stages {
+        stage('Delete Folders from GCS Bucket') {
+            steps {
+                script {
+                    def bucketName = 'your-gcs-bucket-name'
+                    def folderPrefix = 'your/gcs/path/'
+                    def startDate = params.startDate
+                    def endDate = params.endDate
+                    
+                    if (startDate.isEmpty() || endDate.isEmpty()) {
+                        error('Start date and end date parameters are required')
+                    }
+                    
+                    // Authenticate with Google Cloud SDK
+                    sh "gcloud auth activate-service-account --key-file=your-service-account-key-file.json"
+                    
+                    // List folders matching the date range
+                    def cmd = "gsutil ls -d gs://${bucketName}/${folderPrefix}${startDate}*"
+                    def foldersToDelete = sh(script: cmd, returnStdout: true).split('\n').findAll {
+                        it >= "${folderPrefix}${startDate}" && it <= "${folderPrefix}${endDate}"
+                    }
+                    
+                    // Delete folders
+                    foldersToDelete.each { folder ->
+                        sh "gsutil -m rm -r ${folder}"
+                        echo "Deleted folder: ${folder}"
+                    }
+                }
+            }
+        }
+    }
+}
