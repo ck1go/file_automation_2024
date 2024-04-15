@@ -1,0 +1,47 @@
+pipeline {
+    agent any
+
+    environment {
+        BUCKET_PATH = 'your_bucket_path'
+        TWO_YEARS_AGO = sh(script: "date -d '-1 years' +%Y%m%d", returnStdout: true).trim()
+        CURRENT_DATE = sh(script: "date +%Y%m%d", returnStdout: true).trim()
+    }
+
+    stages {
+        stage('Delete Two Years Old Data from Bucket') {
+            steps {
+                script {
+                    // List data older than two years in Google Storage bucket path
+                    def bucketContents = sh(script: "gsutil ls gs://${BUCKET_PATH}/", returnStdout: true).trim().split('\n')
+
+                    // Delete data older than two years
+                    bucketContents.each { object ->
+                        def objectDate = object.split('/')[-1]
+                        
+                        if (objectDate < TWO_YEARS_AGO) {
+                            sh "gsutil rm -r ${object}"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Delete Data from Current System Date') {
+            steps {
+                script {
+                    // List data in Google Storage bucket path
+                    def bucketContents = sh(script: "gsutil ls gs://${BUCKET_PATH}/", returnStdout: true).trim().split('\n')
+
+                    // Delete data from the current system date
+                    bucketContents.each { object ->
+                        def objectDate = object.split('/')[-1]
+                        
+                        if (objectDate == CURRENT_DATE) {
+                            sh "gsutil rm -r ${object}"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
