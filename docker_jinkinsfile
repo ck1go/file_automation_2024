@@ -1,0 +1,42 @@
+pipeline {
+    agent any
+
+    parameters {
+        string(name: 'CONTAINER_ID', defaultValue: '', description: 'ID of the Docker container to login and execute the script')
+    }
+
+    stages {
+        stage('Login to Docker Container') {
+            steps {
+                script {
+                    // Validate if CONTAINER_ID parameter is provided
+                    if (params.CONTAINER_ID.isEmpty()) {
+                        error "CONTAINER_ID parameter is required."
+                    }
+
+                    // Login to Docker container
+                    def loginCmd = "docker exec -u 0 -it ${params.CONTAINER_ID} /bin/bash"
+                    sh(loginCmd)
+                }
+            }
+        }
+
+        stage('Execute Shell Script') {
+            steps {
+                script {
+                    // Path to the shell script inside the Docker container
+                    def scriptPath = "/path/to/your/script.sh"
+
+                    // Check if the script exists
+                    if (!sh(script: "[ -f ${scriptPath} ]", returnStatus: true) == 0) {
+                        error "Script ${scriptPath} does not exist."
+                    }
+
+                    // Execute the shell script inside the Docker container
+                    def executeScriptCmd = "docker exec -u 0 -it ${params.CONTAINER_ID} ${scriptPath}"
+                    sh(executeScriptCmd)
+                }
+            }
+        }
+    }
+}
